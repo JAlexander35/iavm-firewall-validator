@@ -88,7 +88,34 @@ def clean_str(value) -> str:
     if pd.isna(value):
         return ""
     return str(value).strip()
+    
+def derive_action_flags(recommendation: str) -> Tuple[str, str]:
+    rec = clean_str(recommendation).lower()
 
+    detect_phrases = [
+        "enable in detect",
+        "set to detect",
+        "move to detect",
+        "detect first",
+        "active in detect",
+    ]
+
+    prevent_phrases = [
+        "set to prevent",
+        "move to prevent",
+        "enable in prevent",
+        "active in prevent",
+        "consider moving to prevent",
+        "consider prevent",
+        "then consider prevent",
+        "promoting to blocking mode",
+        "promoted to prevent",
+    ]
+
+    set_detect = "✓" if any(x in rec for x in detect_phrases) else ""
+    set_prevent = "✓" if any(x in rec for x in prevent_phrases) else ""
+
+    return set_detect, set_prevent
 
 def split_cves(value) -> List[str]:
     if pd.isna(value):
@@ -369,9 +396,9 @@ def classify_priority(nvd: Optional[CveResult], sig_available: str, mode: str) -
         return "High"
 
     if sig_available == "Y" and mode in {"Inactive", "Detect"}:
-        return "Medium"
+        return "Moderate"
     if network == "Y":
-        return "Medium"
+        return "Moderate"
 
     return "Low"
 
@@ -481,6 +508,10 @@ def enrich_rows(
         notes, rec, priority = choose_recommendation(row, nvd, sig_available, overall_mode, perf)
         row[COL_NOTES] = notes
         row[COL_REC] = rec
+        
+        set_detect, set_prevent = derive_action_flags(rec)
+        row["Recommended Set to Detect?"] = set_detect
+        row["Recommended Set to Prevent?"] = set_prevent
 
         row["Analyst Priority"] = priority
         row["NVD Description"] = nvd.description if nvd else ""
@@ -527,6 +558,7 @@ def build_grouped_sheet(flat_df: pd.DataFrame) -> pd.DataFrame:
 def build_original_row_summary(flat_df: pd.DataFrame) -> pd.DataFrame:
     summary_rows = []
     grouped = flat_df.groupby("Source Worksheet Row", dropna=False)
+
     for source_row, group in grouped:
         mode_values = set(group[COL_MODE].astype(str))
         legacy_mode_values = set(group[COL_MODE_LEGACY].astype(str))
@@ -548,34 +580,45 @@ def build_original_row_summary(flat_df: pd.DataFrame) -> pd.DataFrame:
             highest_legacy_mode = "NA"
 
         priority_values = [clean_str(v) for v in group["Analyst Priority"] if clean_str(v)]
-        priority_order = ["Critical", "High", "Medium", "Low"]
+        priority_order = ["Critical", "High", "Moderate", "Low"]
         ordered_priorities = [p for p in priority_order if p in set(priority_values)]
+
+        recommendation_summary = " | ".join(
+            f"{r[COL_CVES]}: {clean_str(r[COL_REC])}" for _, r in group.iterrows()
+        )
+
+        set_detect, set_prevent = derive_action_flags(recommendation_summary)
 
         summary_rows.append(
             {
                 "Source Worksheet Row": source_row,
                 COL_IAVM: clean_str(group.iloc[0].get(COL_IAVM, "")),
-                "Flattened CVEs": "; ".join(group[COL_CVES].astype(str).tolist()),
+                "Flattened CVEs": ", ".join(group[COL_CVES].astype(str).tolist()),
                 "Any Signature Available": "Y" if any(group[COL_SIG].astype(str).eq("Y")) else "N",
                 "Highest Active IPS Mode": highest_mode,
                 "Highest Active IPS Mode (Legacy)": highest_legacy_mode,
                 "Coverage Summary": " | ".join(
-                    sorted(set(clean_str(v) for v in group[COL_FW] if clean_str(v) and clean_str(v) != "N/A"))
+                    sorted(
+                        set(
+                            clean_str(v)
+                            for v in group[COL_FW]
+                            if clean_str(v) and clean_str(v) != "N/A"
+                        )
+                    )
                 ) or "N/A",
-                "Priority Summary": "; ".join(ordered_priorities),
-                "Recommendation Summary": " | ".join(
-                    f"{r[COL_CVES]}: {clean_str(r[COL_REC])}" for _, r in group.iterrows()
-                ),
+                "Priority Summary": ", ".join(ordered_priorities),
+                "Recommendation Summary": recommendation_summary,
+                "Set to Detect?": set_detect,
+                "Set to Prevent?": set_prevent,
             }
         )
+
     return pd.DataFrame(summary_rows)
 
 
 
-
-
 def priority_sort_key(value: str) -> int:
-    order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
+    order = {"Critical": 0, "High": 1, "Moderate": 2, "Low": 3}
     return order.get(clean_str(value), 99)
 
 
@@ -592,6 +635,14 @@ def build_findings_summary(flat_df: pd.DataFrame, grouped_df: pd.DataFrame, prof
     priority_counts = flat_df["Analyst Priority"].astype(str).value_counts() if "Analyst Priority" in flat_df.columns else pd.Series(dtype=int)
     mode_counts = flat_df[COL_MODE].astype(str).value_counts() if COL_MODE in flat_df.columns else pd.Series(dtype=int)
 
+    recommended_detect = int(
+        (flat_df["Recommended Set to Detect?"].astype(str) == "✓").sum()
+    ) if "Recommended Set to Detect?" in flat_df.columns else 0
+
+    recommended_prevent = int(
+        (flat_df["Recommended Set to Prevent?"].astype(str) == "✓").sum()
+    ) if "Recommended Set to Prevent?" in flat_df.columns else 0
+    
     total_sig = int((flat_df[COL_SIG].astype(str) == "Y").sum()) if COL_SIG in flat_df.columns else 0
     total_no_sig = int((flat_df[COL_SIG].astype(str) == "N").sum()) if COL_SIG in flat_df.columns else 0
     total_network = int((flat_df[COL_NET].astype(str) == "Y").sum()) if COL_NET in flat_df.columns else 0
@@ -630,10 +681,15 @@ def build_findings_summary(flat_df: pd.DataFrame, grouped_df: pd.DataFrame, prof
 
     findings_narrative = [
         f"FAP reviewed {total_cves} CVEs across {total_iavms} IAVM notice blocks against the provided Check Point IPS export for profile(s): {profile_text}.",
-        f"The review identified {priority_counts.get('Critical', 0)} Critical, {priority_counts.get('High', 0)} High, {priority_counts.get('Medium', 0)} Medium, and {priority_counts.get('Low', 0)} Low priority CVEs.",
+        f"The review identified {priority_counts.get('Critical', 0)} Critical, {priority_counts.get('High', 0)} High, {priority_counts.get('Moderate', 0)} Moderate, and {priority_counts.get('Low', 0)} Low priority CVEs.",
         f"IPS protections were matched for {total_sig} CVEs, while {total_no_sig} CVEs had no matching protection in the provided export.",
         f"Of the reviewed CVEs, {total_network} were identified as network exploitable and {total_kev} were flagged in CISA KEV."
     ]
+    
+    if recommended_detect or recommended_prevent:
+        findings_narrative.append(
+            f"Recommended IPS actions identified {recommended_detect} CVEs for Detect-first review and {recommended_prevent} CVEs for possible promotion to Prevent."
+        )
 
     if not critical_or_high.empty:
         findings_narrative.append(
@@ -669,7 +725,7 @@ def build_findings_summary(flat_df: pd.DataFrame, grouped_df: pd.DataFrame, prof
     rows.append({"Section": "Assessment Metadata", "Metric": "Total IAVM Notice Blocks", "Value": total_iavms, "Details": ""})
     rows.append({"Section": "Assessment Metadata", "Metric": "Total Flattened CVEs", "Value": total_cves, "Details": ""})
 
-    for label in ["Critical", "High", "Medium", "Low"]:
+    for label in ["Critical", "High", "Moderate", "Low"]:
         rows.append({"Section": "Summary Metrics", "Metric": f"{label} Priority CVEs", "Value": int(priority_counts.get(label, 0)), "Details": ""})
 
     metric_rows = [
@@ -678,7 +734,9 @@ def build_findings_summary(flat_df: pd.DataFrame, grouped_df: pd.DataFrame, prof
         ("CVEs With Matching IPS Protection", total_sig),
         ("CVEs Without Matching IPS Protection", total_no_sig),
         ("CVEs In Prevent", int(mode_counts.get("Prevent", 0))),
+        ("CVEs Recommended to Set to Prevent", recommended_prevent),
         ("CVEs In Detect", int(mode_counts.get("Detect", 0))),
+        ("CVEs Recommended to Set to Detect", recommended_detect),
         ("CVEs Inactive", int(mode_counts.get("Inactive", 0))),
         ("CVEs N/A", int(mode_counts.get("N/A", 0))),
     ]
@@ -781,7 +839,7 @@ def append_df_to_ws(ws, df: pd.DataFrame) -> None:
                 ws.cell(row=row_num, column=priority_col_idx).font = Font(color="FFFFFF", bold=True)
             elif p == "High":
                 ws.cell(row=row_num, column=priority_col_idx).fill = _BAD_FILL
-            elif p == "Medium":
+            elif p == "Moderate":
                 ws.cell(row=row_num, column=priority_col_idx).fill = _WARN_FILL
             else:
                 ws.cell(row=row_num, column=priority_col_idx).fill = _GOOD_FILL
@@ -839,6 +897,8 @@ def write_output(
         "Coverage Summary",
         "Priority Summary",
         "Recommendation Summary",
+        "Set to Detect?",
+        "Set to Prevent?",
     ]
 
     start_col = len(original_headers) + 1
@@ -861,6 +921,8 @@ def write_output(
             clean_str(summary.get("Coverage Summary", "")),
             clean_str(summary.get("Priority Summary", "")),
             clean_str(summary.get("Recommendation Summary", "")),
+            clean_str(summary.get("Set to Detect?", "")),
+            clean_str(summary.get("Set to Prevent?", "")),
         ]
 
         for offset, value in enumerate(values):
@@ -895,7 +957,6 @@ def write_output(
     )
 
     wb.save(output_path)
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
