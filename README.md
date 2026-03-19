@@ -1,138 +1,115 @@
-# Check Point CVE IPS Correlator
+# 🔥 Check Point CVE IPS Correlator
 
-Automates correlation of **IAVM / CVE vulnerability data with Check Point IPS signature coverage** to support firewall assurance assessments, exposure analysis, and mitigation prioritization.
-
-This tool is designed for firewall engineers, vulnerability analysts, and assurance teams who must quickly determine whether firewall-layer protections exist for known vulnerabilities.
+> Automated IPS coverage analysis and mitigation recommendation engine for Firewall Assurance and Vulnerability Management workflows.
 
 ---
 
-## Problem This Tool Solves
+## 🚀 Overview
 
-In many environments, vulnerability teams provide large spreadsheets containing:
+The **Check Point CVE IPS Correlator** automates the correlation of:
 
-- IAVM notices  
-- grouped CVEs  
-- limited exploitability context  
+- IAVM vulnerability notices  
+- grouped CVE datasets  
+- Check Point IPS protection exports  
 
-Firewall teams must then manually:
+It enables cybersecurity teams to **rapidly determine firewall-layer mitigation posture**, identify **coverage gaps**, and generate **operationally actionable recommendations**.
 
-- search IPS exports  
-- determine enforcement mode  
-- assess whether protections are active  
-- identify exposure gaps  
-- produce mitigation recommendations  
+This tool is built specifically for:
 
-This process is time-consuming and inconsistent.
-
-**This tool automates that correlation workflow.**
+- Firewall Assurance Programs (FAP)
+- Firewall Operations teams
+- Vulnerability Management analysts
+- Cybersecurity Infrastructure engineers
+- Risk and RMF stakeholders
 
 ---
 
-## What the Tool Does
+## 🎯 Why This Tool Matters
 
-The script:
+Manual IPS coverage validation requires:
 
-- parses CVE / IAVM vulnerability workbooks  
-- expands grouped CVEs into per-CVE analysis rows  
-- correlates vulnerabilities against Check Point IPS signature exports  
-- determines inferred enforcement posture:
-  - Prevent  
-  - Detect  
-  - Inactive / not clearly active  
-- optionally enriches vulnerabilities with NVD metadata:
-  - CVSS score  
-  - severity  
-  - attack vector  
-  - exploitability context  
-- preserves the original workbook and generates analyst-friendly review tabs  
+- Searching large SmartConsole exports  
+- Determining enforcement modes per gateway profile  
+- Validating exploitability context  
+- Writing mitigation recommendations  
+- Producing ChangeGear ticket justification  
 
----
+This process is:
 
-## Key Features
+❌ Time‑intensive  
+❌ Prone to analyst inconsistency  
+❌ Difficult to scale  
 
-### Vulnerability Processing
-- Supports multiple CVEs per IAVM block  
-- Handles mixed formatting within CVE fields  
-- Maintains original vulnerability context while enabling per-CVE analysis  
-
-### IPS Signature Correlation
-- Accepts Check Point IPS exports in CSV or XLSX format  
-- Matches vulnerabilities using CVE identifiers in signature metadata  
-- Infers IPS posture based on profile / gateway action columns  
-- Highlights potential mitigation gaps  
-
-### Analyst Review Views
-- Generates flattened CVE view  
-- Generates grouped IAVM summary view  
-- Generates original-row mitigation summary  
-- Adds manual review columns for analyst validation  
-
-### NVD Enrichment
-- Optional live enrichment via NIST NVD API  
-- Local caching supported for repeat runs  
-- Adds exploitability context to support prioritization  
-
-### Non-Destructive Output
-- Preserves the original workbook  
-- Adds new tabs rather than rebuilding source content  
+✅ This tool standardizes and automates the workflow.
 
 ---
 
-## Typical Use Cases
+## ⚙️ Core Capabilities
 
-- Firewall Assurance Program reviews  
-- vulnerability mitigation validation  
-- IPS coverage gap identification  
-- IAVM exposure analysis  
-- change-ticket justification support  
-- risk prioritization workshops  
-- firewall operations coordination  
+### 🔎 CVE Processing
 
----
+- Automatically expands grouped CVEs from IAVM blocks  
+- Handles inconsistent spreadsheet formatting  
+- Preserves original vulnerability context  
+- Produces per‑CVE actionable analysis rows  
 
-## Expected Inputs
+### 🛡 IPS Coverage Correlation
 
-### CVE / IAVM Workbook
+- Matches CVEs against Check Point IPS metadata  
+- Determines enforcement posture:
+  - Prevent
+  - Detect
+  - Inactive
+  - No IPS Coverage  
+- Identifies mitigation gaps requiring patching or compensating controls  
 
-An Excel workbook containing vulnerability blocks.  
-Common fields include:
+### 📊 Findings Summary Engine
 
-- IAVM Notice  
-- Description  
-- Related CVE(s)  
-- STIG Severity  
-- existing mitigation notes (optional)  
+Generates executive‑ready program metrics:
 
-Grouped CVEs will be automatically flattened.
-
-### Check Point IPS Export
-
-Exported from SmartConsole.  
-Typical relevant fields include:
-
-- Protection name  
-- Industry Reference / Industry Release (contains CVE identifiers)  
-- Performance Impact  
-- profile action columns such as:
-  - Default Protection  
-  - environment-specific profile columns (e.g. `DCMA_NIPRNET`)  
+| Metric | Purpose |
+|--------|--------|
+| Network Exploitable CVEs | Exposure prioritization |
+| CISA KEV CVEs | Active threat prioritization |
+| CVEs With IPS Coverage | Compensating control validation |
+| CVEs Without IPS Coverage | Patch urgency indicator |
+| CVEs In Prevent | Active blocking posture |
+| CVEs In Detect | Monitoring posture |
+| CVEs Inactive | Misconfiguration indicator |
+| CVEs Recommended → Detect | Tuning actions |
+| CVEs Prevent Candidates | Future blocking posture |
 
 ---
 
-## Output Workbook Structure
+## 🧠 Operational Recommendation Logic
 
-The enriched workbook contains:
+The tool follows **real‑world firewall engineering practice**:
 
-- **Original_CVE_Block** — preserved source content with added summary columns  
-- **Flat_CVE_View** — one row per CVE with IPS correlation and enrichment data  
-- **Grouped_IAVM_View** — IAVM-level aggregation of mitigation posture and risk indicators  
-- **Original_Row_Summary** — per-row mitigation summary for quick validation  
+| Scenario | Recommendation |
+|---------|---------------|
+| Signature active in Prevent | Validate traffic relevance |
+| Signature inactive or Detect | Enable in Detect for tuning |
+| Signature exists but unused | Enable in Detect |
+| No signature exists | Patch / compensating control |
+| After validation | Consider promotion to Prevent |
+
+This reflects **safe IPS deployment methodology** used in enterprise and DoD environments.
 
 ---
 
-## Installation
+## 📁 Output Workbook Tabs
 
-Clone the repository and install dependencies:
+| Tab | Purpose |
+|-----|--------|
+| Original_CVE_Block | Preserved source data with added summary |
+| Flat_CVE_View | Per‑CVE technical analysis |
+| Grouped_IAVM_View | Notice‑level posture aggregation |
+| Original_Row_Summary | Quick validation metrics |
+| Findings_Summary | Executive metrics and narrative |
+
+---
+
+## 🧰 Installation
 
 ```bash
 pip install -r requirements.txt
@@ -140,85 +117,81 @@ pip install -r requirements.txt
 
 ---
 
-## Usage
+## ▶️ Usage
 
-### Basic execution
-
-```bash
-python checkpoint_cve_iavm_enricher_v2.py --cve "CVE Block Example.xlsx" --ips "IPS Sigs Export.csv" --out "CVE Block Enriched.xlsx"
-```
-
-### Specify profile columns
+### Basic Run
 
 ```bash
-python checkpoint_cve_iavm_enricher_v2.py --cve "CVE Block Example.xlsx" --ips "IPS Sigs Export.csv" --out "CVE Block Enriched.xlsx" --profile-columns "Default Protection" "DCMA_NIPRNET"
+python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx"
 ```
 
-### Skip NVD enrichment
+### Specify Firewall Profile
 
 ```bash
-python checkpoint_cve_iavm_enricher_v2.py --cve "CVE Block Example.xlsx" --ips "IPS Sigs Export.csv" --out "CVE Block Enriched.xlsx" --skip-nvd
+python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx" --profile-columns DCMA_NIPRNET
 ```
 
-### Use local NVD cache
+### Skip NVD Enrichment
 
 ```bash
-python checkpoint_cve_iavm_enricher_v2.py --cve "CVE Block Example.xlsx" --ips "IPS Sigs Export.csv" --out "CVE Block Enriched.xlsx" --cache nvd_cache.json
+python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx" --skip-nvd
+```
+
+### Use Cached NVD Data
+
+```bash
+python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx" --cache nvd_cache.json
 ```
 
 ---
 
-## Recommended Workflow
+## 🧭 Recommended Operational Workflow
 
-1. Export installed IPS protections from Check Point SmartConsole  
-2. Obtain vulnerability spreadsheet from vulnerability management team  
-3. Run the correlator script  
-4. Review generated tabs for:
-   - IPS coverage  
-   - enforcement posture  
-   - potential exposure gaps  
-   - analyst recommendation context  
-5. Validate edge cases before final reporting  
+1. Export IPS protections from SmartConsole  
+2. Obtain vulnerability workbook from CVM  
+3. Execute correlator  
+4. Review Findings Summary  
+5. Validate exposure paths  
+6. Generate remediation tickets  
+7. Coordinate tuning or patching  
 
 ---
 
-## Matching Considerations
+## ⚠️ Matching Limitations
 
-- Best results occur when IPS exports contain CVE identifiers in metadata fields  
-- Some protections reference vendor advisories instead of CVEs  
-- Final exposure determination still requires firewall path validation and operational context review  
-
----
-
-## Security and Data Handling
-
-Use sanitized data only when sharing examples.  
-Do not publish:
-
-- production firewall exports  
-- CUI or export-controlled vulnerability data  
-- sensitive network architecture details  
+- Some IPS protections reference advisories instead of CVEs  
+- Signature presence does not guarantee traffic exposure  
+- Final risk determination requires architecture validation  
 
 ---
 
-## Roadmap
+## 🔐 Security Handling Guidance
 
-Future improvements may include:
+When sharing examples:
 
-- fallback matching using protection text  
-- configurable profile logic  
-- risk scoring model  
-- summary reporting dashboards  
-- packaging as an installable CLI tool  
-- automated unit tests  
+❗ Use sanitized data  
+❗ Do not include production firewall exports  
+❗ Do not publish CUI vulnerability datasets  
+❗ Avoid internal network architecture details  
 
 ---
 
-## Repository Structure
+## 🗺 Future Roadmap
+
+- Fuzzy IPS signature matching  
+- Exposure risk scoring model  
+- KEV‑weighted prioritization  
+- Firewall path validation logic  
+- Dashboard reporting  
+- Packaged CLI distribution  
+
+---
+
+## 📦 Repository Structure
 
 ```
 checkpoint-cve-ips-correlator/
-├── checkpoint_cve_iavm_enricher_v2.py
+├── checkpoint_cve_iavm_enricher_v3.py
 ├── README.md
 ├── requirements.txt
 ├── examples/
@@ -227,6 +200,12 @@ checkpoint-cve-ips-correlator/
 
 ---
 
-## License
+## ⭐ Contribution
+
+Improvements, issue reports, and workflow suggestions are welcome.
+
+---
+
+## 📜 License
 
 Add an appropriate license prior to public distribution.
