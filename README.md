@@ -128,7 +128,7 @@ python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Expo
 ### Specify Firewall Profile
 
 ```bash
-python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx" --profile-columns DCMA_NIPRNET
+python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx" --profile-columns <profile>
 ```
 
 ### Skip NVD Enrichment
