@@ -277,6 +277,103 @@ def infer_profile_columns(df_ips: pd.DataFrame) -> List[str]:
 
     return profile_cols
 
+def infer_patch_target(desc: str) -> str:
+    text = clean_str(desc)
+    if not text:
+        return "the affected application or platform"
+    
+    patterns = [
+        r"^(.+?)\s+before\s+\d",
+        r"^(.+?)\s+through\s+\d",
+        r"^(.+?)\s+prior to\s+\d",
+        r"^(.+?)\s+versions?\s",
+        r"^(.+?)\s+allows?\s",
+        r"^(.+?)\s+contains?\s",
+        r"^(.+?)\s+is affected",
+        r"^A vulnerability in\s+(.+?)(?:\s+could|\s+allows?|\s+exists|\s+may|\.)",
+        r"^An issue was discovered in\s+(.+?)(?:\s+before|\s+through|\s+that|\.)",
+        r"^Improper.+? in\s+(.+?)(?:\s+before|\s+through|\.)",
+    ]
+    
+    for pattern in patterns:
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if m:
+            target = clean_str(m.group(1))
+            target = re.sub(r"\s+", " ", target).strip(" ,.-:")
+            if target:
+                return target
+            
+    words = text.split()
+    fallback = " ".join(words[:6]).strip(" ,.-:")
+    return fallback if fallback else "the affected application or platform"
+
+def build_dynamic_recommendation(
+    patch_target: str,
+    network: str,
+    kev: bool,
+    sig_available: str,
+    overall_mode: str,
+    priority: str,
+) -> str:
+    base = f"Apply vendor-recommended security updates for {patch_target} to remediate this vulnerability."
+    
+    context_bits = []
+    action_bits = []
+    
+    if network == "Y":
+        context_bits.append("This CVE is not network exploitable")
+    elif network == "N":
+        context_bits.append("No network attack vector was identified from available CVSS/NVD data.")
+        
+    if kev:
+        context_bits.append("This CVE is flagged in CISA KEV.")
+        
+    if sig_available == "Y":
+        if overall_mode == "Prevent":
+            context_bits.append(
+                "A matching IPS protection is active in Prevent mode and provides compensating network-layer mitigation."
+            )
+            action_bits.append(
+                "Continue monitoring coverage and false positives until system remediation is complete."
+            )
+        elif overall_mode == "Detect":
+            context_bits.append(
+                "A matching IPS protection is active in Detect mode, which provides visibility rather than blocking."
+            )
+            action_bits.append(
+                "Review traffic relevance and event activity to determine whether promotion to Prevent is appropriate."
+            )
+        elif overall_mode == "Inactive":
+            context_bits.append(
+                "A matching IPS protection exists in the reviewed export but is currently inactive."
+            )
+            action_bits.append(
+                "If traffic relevance is confirmed, consider enabling the protection in Detect mode before potential promotion to Prevent."
+            )
+        else:
+            context_bits.append(
+                "A matching IPS protection exists, but no applicable active mode was identified in the reviewed profile columns."
+            )
+            action_bits.append(
+                "Validate protection applicability, profile assignment, and traffic relevance before considering Detect-mode enablement."
+            )
+    else:
+        context_bits.append(
+            "No matching IPS protection was identified in the reviewed export."
+        )
+        if network == "Y":
+            action_bits.append(
+                "Validate compensating controls and monitor for signature availability."
+            )
+        else:
+            action_bits.append(
+                "Firewall IPS mitigation is likely not the primary control for this issue."
+            )
+
+    if priority in {"Critical", "High"} or (kev and network == "Y"):
+        action_bits.insert(0, "Expedite remediation based on severity and exposure.")
+
+    return " ".join([base] + context_bits + action_bits)
 
 def normalize_mode(value: str) -> str:
     s = clean_str(value).lower()
@@ -541,6 +638,8 @@ def choose_recommendation(
     desc = clean_str((nvd.description if nvd else "") or row.get(COL_DESC, ""))
     network = clean_str((nvd.network_exploitable if nvd else "") or row.get(COL_NET, ""))
     severity = clean_str((nvd.severity if nvd else "") or row.get(COL_SEVERITY, ""))
+    kev = bool(nvd.cisa_kev) if nvd else False
+
     action_bits = []
 
     if network == "Y":
@@ -550,7 +649,7 @@ def choose_recommendation(
     else:
         action_bits.append("Network exploitability requires analyst review")
 
-    if nvd and nvd.cisa_kev:
+    if kev:
         action_bits.append("Flagged in CISA KEV")
 
     if perf:
@@ -560,46 +659,18 @@ def choose_recommendation(
     if desc:
         action_bits.append(desc)
 
-    if sig_available == "Y":
-        if overall_mode == "Prevent":
-            rec = (
-                "IPS signature is present and active in Prevent. "
-                "Prioritize patching of the affected system. "
-                "Validate gateway coverage and continue monitoring for effectiveness and false positives."
-            )
-        elif overall_mode == "Detect":
-            rec = (
-                "IPS signature is present and active in Detect. "
-                "Prioritize patching of the affected system. "
-                "Review events and traffic relevance, then consider promotion to Prevent if validation supports blocking."
-            )
-        elif overall_mode == "Inactive":
-            rec = (
-                "IPS signature exists but is inactive in the reviewed profile or gateway columns. "
-                "Prioritize patching of the affected system. "
-                "If traffic relevance is confirmed, consider enabling the protection in Detect mode before potential promotion to Prevent."
-            )
-        else:
-            rec = (
-                "IPS signature exists, but no applicable active mode was identified in the reviewed profile columns. "
-                "Prioritize patching of the affected system. "
-                "Validate protection applicability, profile assignment, and traffic relevance before considering Detect-mode enablement."
-            )
-    else:
-        if network == "Y":
-            rec = (
-                "No IPS signature was identified in the provided profile export. "
-                "Prioritize patching of the affected system. "
-                "If a relevant IPS protection becomes available, consider enabling it in Detect mode for validation before potential promotion to Prevent."
-            )
-        else:
-            rec = (
-                "No IPS signature was identified in the provided profile export. "
-                "Prioritize patching of the affected system. "
-                "Firewall IPS mitigation is likely not applicable based on the lack of a network attack vector."
-            )
-
     priority = classify_priority(nvd, sig_available, overall_mode)
+    patch_target = infer_patch_target(desc)
+
+    rec = build_dynamic_recommendation(
+        patch_target=patch_target,
+        network=network,
+        kev=kev,
+        sig_available=sig_available,
+        overall_mode=overall_mode,
+        priority=priority,
+    )
+
     return ". ".join(action_bits).strip(), rec, priority
 
 
@@ -843,7 +914,7 @@ def build_findings_summary(flat_df: pd.DataFrame, grouped_df: pd.DataFrame, prof
         )
 
     recommended_actions = [
-        "Prioritize patching or compensating controls for Critical and High CVEs, especially where no matching IPS protection was identified.",
+        "Prioritize vendor-recommended remediation for Critical and High CVEs, especially where the CVE is network exploitable, flagged in CISA KEV, or lacks effective IPS prevention in the reviewed export.",
         "Validate that the reviewed gateway/profile columns represent the relevant traffic path before treating IPS coverage as sufficient.",
         "Review signatures in Detect or Inactive mode and coordinate with firewall operations to determine whether they should be enabled, tuned, or promoted to Prevent.",
         "Coordinate with ICVM/CVM or system owners for follow-up remediation validation and residual risk tracking for CVEs lacking effective firewall-layer mitigation.",
