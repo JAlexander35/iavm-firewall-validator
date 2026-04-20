@@ -109,6 +109,46 @@ This reflects **safe IPS deployment methodology** used in enterprise and DoD env
 
 ---
 
+# 📸 Example Output
+
+## Firewall Action Queue
+![Firewall Action Queue](docs/screenshots/firewall_action_queue.png)
+
+## Flat CVE View
+![Flat CVE View](docs/screenshots/flat_cve_view.png)
+
+## Findings Summary
+![Findings Summary](docs/screenshots/findings_summary.png)
+
+---
+
+# 📂 File Structure
+
+```
+input/
+├── CVE_blocks/
+│   └── <Month Folder>/
+├── IPS/
+
+output/
+├── enriched/
+│   └── <Month Folder>/
+
+scripts/
+└── checkpoint_cve_iavm_enricher.py
+```
+---
+
+# ⚙️ How It Works
+
+- CVE file → auto-selected by **latest date in filename**
+- IPS file → auto-selected by **latest modified file**
+- Output → auto-generated in:
+  ```
+  output/enriched/<Month Folder>/
+
+---
+
 ## 🧰 Installation
 
 ```bash
@@ -117,32 +157,21 @@ pip install -r requirements.txt
 
 ---
 
-## ▶️ Usage
+# ▶️ Usage
 
-### Basic Run
-
-```bash
-python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx"
+## Simple Run
 ```
-
-### Specify Firewall Profile
-
-```bash
-python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx" --profile-columns <profile>
+python scripts/checkpoint_cve_iavm_enricher.py
 ```
-
-### Skip NVD Enrichment
-
-```bash
-python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx" --skip-nvd
+## Optional Arguments
 ```
-
-### Use Cached NVD Data
-
-```bash
-python checkpoint_cve_iavm_enricher_v3.py --cve "CVE_Block.xlsx" --ips "IPS_Export.xlsx" --out "CVE_Block_Enriched.xlsx" --cache nvd_cache.json
+--cve <path>        # manually specify CVE workbook
+--ips <path>        # manually specify IPS export
+--out <path>        # manually specify output file
+--skip-nvd          # skip NVD API enrichment
+--delay <seconds>   # delay between NVD requests (default: 1.2)
+--cache <file>      # NVD cache file (default: nvd_cache.json)
 ```
-
 ---
 
 ## 🧭 Recommended Operational Workflow
